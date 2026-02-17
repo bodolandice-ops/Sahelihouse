@@ -3,52 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QR Scanner Pro</title>
+    <title>QR Quest - Manual Sync</title>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
-        :root { --primary: #00ff88; --bg: #121212; --card: #1e1e1e; }
+        :root { --primary: #00ff88; --bg: #121212; --card: #1e1e1e; --accent: #00ccff; }
         body { 
             margin: 0; padding: 0; font-family: sans-serif; 
             background: var(--bg); color: white; overflow: hidden; 
         }
 
-        /* Camera Viewport */
         #video { width: 100vw; height: 100vh; object-fit: cover; position: fixed; top: 0; left: 0; }
 
-        /* UI Layers */
         .ui-layer { position: absolute; z-index: 10; width: 100%; pointer-events: none; }
         .top-ui { top: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.8), transparent); padding: 20px 0; text-align: center; }
-        .bottom-ui { bottom: 0; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); padding: 40px 0; text-align: center; }
 
         input { 
             pointer-events: auto; padding: 12px; border-radius: 25px; border: 1px solid var(--primary);
             background: rgba(0,0,0,0.5); color: white; width: 70%; text-align: center; font-size: 16px;
         }
 
-        /* Target Reticle */
         #reticle {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 250px; height: 250px; border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 20px; transition: all 0.3s;
+            width: 220px; height: 220px; border: 2px dashed rgba(255,255,255,0.5);
+            border-radius: 20px; z-index: 5;
         }
-        .active-scan { border-color: var(--primary) !important; box-shadow: 0 0 20px var(--primary); }
 
-        /* Success Message Overlay */
-        #success-msg {
+        /* The Confirmation Modal */
+        #confirm-modal {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
-            background: var(--card); padding: 25px; border-radius: 15px; border: 2px solid var(--primary);
+            background: var(--card); padding: 25px; border-radius: 20px; border: 2px solid var(--accent);
             text-align: center; opacity: 0; visibility: hidden; transition: 0.3s; z-index: 100;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 80%;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8); width: 85%; pointer-events: auto;
         }
-        #success-msg.show { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
+        #confirm-modal.show { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
 
-        .data-label { color: var(--primary); font-size: 12px; text-transform: uppercase; margin-bottom: 5px; display: block; }
-        .data-value { font-weight: bold; font-size: 18px; word-break: break-all; }
-
-        #status-pill {
-            display: inline-block; padding: 5px 15px; border-radius: 20px;
-            background: rgba(0,255,136,0.2); color: var(--primary); font-size: 12px; margin-top: 10px;
+        .btn-confirm {
+            background: var(--primary); color: #000; border: none; padding: 15px 30px;
+            font-size: 18px; font-weight: bold; border-radius: 30px; margin-top: 20px;
+            width: 100%; cursor: pointer; active: transform: scale(0.95);
         }
+
+        .btn-cancel {
+            background: transparent; color: #ff4444; border: none; margin-top: 15px;
+            font-size: 14px; cursor: pointer; text-decoration: underline;
+        }
+
+        .data-label { color: var(--accent); font-size: 12px; text-transform: uppercase; margin-bottom: 5px; display: block; }
+        .data-value { font-weight: bold; font-size: 20px; word-break: break-all; color: #fff; }
     </style>
 </head>
 <body>
@@ -57,37 +58,33 @@
     <canvas id="canvas" hidden></canvas>
 
     <div class="ui-layer top-ui">
-        <input type="text" id="playerName" placeholder="Enter Player Name">
+        <input type="text" id="playerName" placeholder="Your Name">
     </div>
 
     <div id="reticle"></div>
 
-    <div class="ui-layer bottom-ui">
-        <div id="status-pill">Position QR inside frame</div>
-    </div>
-
-    <div id="success-msg">
-        <div style="font-size: 40px; margin-bottom: 10px;">✅</div>
-        <h2 style="margin: 0 0 15px 0;">Scan Complete!</h2>
-        <span class="data-label">Transmitted Data:</span>
+    <div id="confirm-modal">
+        <div style="font-size: 30px; margin-bottom: 10px;">🔍 Scan Found!</div>
+        <span class="data-label">QR Content:</span>
         <div id="display-data" class="data-value">---</div>
-        <hr style="border: 0; border-top: 1px solid #444; margin: 15px 0;">
-        <span class="data-label">Updated to:</span>
-        <div id="display-name" class="data-value">---</div>
+        
+        <button id="sendBtn" class="btn-confirm">SEND TO SHEET</button>
+        <button id="cancelBtn" class="btn-cancel">Discard & Scan Again</button>
     </div>
 
     <script>
         const video = document.getElementById("video");
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
-        const successPopup = document.getElementById("success-msg");
+        const modal = document.getElementById("confirm-modal");
         const displayData = document.getElementById("display-data");
-        const displayName = document.getElementById("display-name");
-        const reticle = document.getElementById("reticle");
+        const sendBtn = document.getElementById("sendBtn");
+        const cancelBtn = document.getElementById("cancelBtn");
         
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyeEZEyivwvc3NjN5MBPoOvCK4GWTQe368JtzNDVIUwv50LUPCdD-xIRGUu_jFCY-T8XA/exec";
 
         let isScanning = true;
+        let pendingData = "";
 
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(stream => {
             video.srcObject = stream;
@@ -105,42 +102,50 @@
                 const code = jsQR(imageData.data, imageData.width, imageData.height);
 
                 if (code) {
-                    processDiscovery(code.data);
+                    showConfirmation(code.data);
                 }
             }
             requestAnimationFrame(tick);
         }
 
-        async function processDiscovery(data) {
-            isScanning = false; // Pause scanner
-            reticle.classList.add("active-scan");
-            
-            const name = document.getElementById("playerName").value || "Anonymous Player";
-            
-            // Update UI with the data being sent
+        function showConfirmation(data) {
+            isScanning = false; 
+            pendingData = data;
             displayData.innerText = data;
-            displayName.innerText = name;
-            successPopup.classList.add("show");
+            modal.classList.add("show");
+            if (navigator.vibrate) navigator.vibrate(100);
+        }
 
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        // Logic for the "OK" / SEND Button
+        sendBtn.onclick = async () => {
+            sendBtn.innerText = "SENDING...";
+            sendBtn.disabled = true;
+            
+            const name = document.getElementById("playerName").value || "Anonymous";
 
             try {
-                // Send to Google Sheet
                 await fetch(SCRIPT_URL, {
                     method: "POST",
                     mode: 'no-cors',
-                    body: JSON.stringify({ qrData: data, playerName: name })
+                    body: JSON.stringify({ qrData: pendingData, playerName: name })
                 });
+                
+                sendBtn.innerText = "✅ SENT!";
+                setTimeout(resetScanner, 1500);
             } catch (e) {
-                console.error("Cloud Sync Error", e);
+                alert("Upload failed. Check your internet.");
+                resetScanner();
             }
+        };
 
-            // Auto-hide message and resume scanning after 3 seconds
-            setTimeout(() => {
-                successPopup.classList.remove("show");
-                reticle.classList.remove("active-scan");
-                isScanning = true;
-            }, 3000);
+        cancelBtn.onclick = resetScanner;
+
+        function resetScanner() {
+            modal.classList.remove("show");
+            sendBtn.innerText = "SEND TO SHEET";
+            sendBtn.disabled = false;
+            pendingData = "";
+            isScanning = true;
         }
     </script>
 </body>
