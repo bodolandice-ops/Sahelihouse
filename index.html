@@ -1,249 +1,104 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>QR Quest - Identity Mode</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<html>
+  <head>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        :root { --primary: #00ff88; --bg: #000; --card: #1a1a1a; --accent: #00ccff; --danger: #ff4444; }
-        * { box-sizing: border-box; }
-        body { 
-            margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background: var(--bg); color: white; display: flex; flex-direction: column; 
-            height: 100vh; height: -webkit-fill-available; overflow: hidden; 
-        }
-
-        /* Camera Area */
-        #video-container { position: relative; flex: 1; overflow: hidden; background: #000; }
-        #video { width: 100%; height: 100%; object-fit: cover; }
-        #reticle {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 180px; height: 180px; border: 2px dashed rgba(0, 255, 136, 0.5); border-radius: 20px;
-            box-shadow: 0 0 0 2000px rgba(0,0,0,0.3);
-        }
-
-        /* Identity Overlay */
-        .identity-overlay {
-            position: absolute; top: 15px; width: 100%; display: flex; flex-direction: column;
-            align-items: center; gap: 10px; z-index: 5;
-        }
-        .id-input {
-            padding: 12px 15px; border-radius: 12px; border: 1px solid var(--primary);
-            background: rgba(0,0,0,0.85); color: white; width: 85%; text-align: center; font-size: 14px;
-            outline: none; transition: 0.3s;
-        }
-        .id-input:focus { box-shadow: 0 0 10px var(--primary); background: #000; }
-
-        /* Bottom Section */
-        #history-section { 
-            height: 40vh; background: #111; display: flex; flex-direction: column; 
-            border-top: 3px solid var(--primary); z-index: 10;
-        }
-        #history-header { padding: 12px 15px; background: #222; display: flex; justify-content: space-between; align-items: center; }
-        
-        .sync-btn {
-            background: #333; color: white; border: none; padding: 12px 24px;
-            border-radius: 30px; font-weight: bold; font-size: 13px; transition: 0.3s;
-        }
-        .sync-btn:not(:disabled) { background: var(--primary); color: #000; cursor: pointer; }
-
-        #history-list { flex: 1; overflow-y: auto; padding: 10px; }
-        .queue-item { 
-            background: var(--card); padding: 12px; border-radius: 8px; margin-bottom: 8px; 
-            display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--accent);
-        }
-        .remove-btn { color: var(--danger); background: none; border: none; font-size: 24px; font-weight: bold; padding: 0 10px; }
-
-        /* Modal */
-        #confirm-modal {
-            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9);
-            background: #222; padding: 25px; border-radius: 20px; border: 2px solid var(--primary);
-            text-align: center; opacity: 0; visibility: hidden; transition: 0.2s; z-index: 100; width: 85%;
-            box-shadow: 0 0 30px rgba(0,0,0,0.5);
-        }
-        #confirm-modal.show { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1); }
-        .modal-btn { background: var(--primary); color: black; border: none; padding: 15px; width: 100%; border-radius: 30px; font-weight: bold; margin-top: 15px; font-size: 16px; }
-        .cancel-btn { background: transparent; color: #999; border: none; margin-top: 10px; width: 100%; text-decoration: underline; }
+      body { background-color: #f4f7f6; padding: 20px; }
+      .form-container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 600px; margin: auto; }
+      .section-title { font-size: 0.9rem; font-weight: bold; color: #6f42c1; text-transform: uppercase; margin-bottom: 15px; border-bottom: 1px solid #eee; }
+      .blouse-only { display: none; background: #fdfbff; padding: 15px; border-radius: 8px; border-left: 4px solid #6f42c1; }
     </style>
-</head>
-<body>
-
-    <div id="video-container">
-        <div class="identity-overlay">
-            <input type="text" id="userName" class="id-input" placeholder="Enter Full Name">
-            <input type="tel" id="userPhone" class="id-input" placeholder="Enter Phone Number">
+  </head>
+  <body>
+    <div class="form-container">
+      <h4 class="text-center mb-4">Product Registration</h4>
+      <form id="regForm" onsubmit="handleFormSubmit(this)">
+        
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">Brand</label>
+            <select class="form-select" name="brand" required>
+              <option value="SWRKHI">SWRKHI</option>
+              <option value="Saheli">Saheli</option>
+            </select>
+          </div>
+          <div class="col">
+            <label class="form-label">Category</label>
+            <select class="form-select" name="category" id="categorySelect" onchange="toggleBlouseFields()" required>
+              <option value="Dokhona">Dokhona</option>
+              <option value="Fasra">Fasra</option>
+              <option value="Aronai">Aronai</option>
+              <option value="Blouse">Blouse</option>
+            </select>
+          </div>
         </div>
-        <video id="video" playsinline></video>
-        <div id="reticle"></div>
-    </div>
 
-    <div id="history-section">
-        <div id="history-header">
-            <span style="font-size: 12px; color: var(--primary); font-weight: bold;">
-                QUEUED: <span id="item-count">0</span>
-            </span>
-            <button id="syncAllBtn" class="sync-btn" disabled>CONFIRM & SYNC</button>
+        <div class="mb-3">
+          <label class="form-label">Fabric Type</label>
+          <input type="text" class="form-control" name="fabric" placeholder="e.g. Silk, Cotton, Eri" required>
         </div>
-        <div id="history-list">
-            <div id="item-list"></div>
+        
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">Color</label>
+            <input type="text" class="form-control" name="color" required>
+          </div>
+          <div class="col">
+            <label class="form-label">Design/Pattern</label>
+            <input type="text" class="form-control" name="design" placeholder="e.g. Agor pattern" required>
+          </div>
         </div>
-    </div>
 
-    <div id="confirm-modal">
-        <div style="font-size: 11px; color: var(--primary); margin-bottom: 5px; letter-spacing: 1px;">QR DETECTED</div>
-        <div id="modal-data" style="font-weight: bold; font-size: 18px; margin-bottom: 15px; word-break: break-all; color: #fff;">---</div>
-        <button id="addBtn" class="modal-btn">ADD TO QUEUE</button>
-        <button id="discardBtn" class="cancel-btn">Discard Scan</button>
+        <div id="blouseFields" class="blouse-only mb-3">
+          <p class="section-title">Blouse Customization Details</p>
+          <div class="row mb-2">
+            <div class="col"><input type="text" class="form-control" name="sleeveLength" placeholder="Sleeve Length"></div>
+            <div class="col"><input type="text" class="form-control" name="size" placeholder="Size (e.g. 38)"></div>
+          </div>
+          <div class="row mb-2">
+            <div class="col"><input type="text" class="form-control" name="frontCut" placeholder="Front Cut Style"></div>
+            <div class="col"><input type="text" class="form-control" name="backCut" placeholder="Back Cut Style"></div>
+          </div>
+          <div class="form-check form-check-inline mt-2">
+            <input class="form-check-input" type="checkbox" name="handwork" value="Yes">
+            <label class="form-check-label">Handwork Included</label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="checkbox" name="lacework" value="Yes">
+            <label class="form-check-label">Lace Work Included</label>
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">Tailor Name</label>
+            <input type="text" class="form-control" name="tailorName">
+          </div>
+          <div class="col">
+            <label class="form-label">Price (₹)</label>
+            <input type="number" class="form-control" name="price" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-dark w-100 py-2" id="submitBtn">Generate QR & Save</button>
+      </form>
     </div>
 
     <script>
-        const video = document.getElementById("video");
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        const modal = document.getElementById("confirm-modal");
-        const itemList = document.getElementById("item-list");
-        const syncBtn = document.getElementById("syncAllBtn");
-        const userNameInput = document.getElementById("userName");
-        const userPhoneInput = document.getElementById("userPhone");
-        
-        // 1. SET YOUR GOOGLE SCRIPT URL HERE
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxB5cyN8Whw6bBtq5Bl9abARGRUN3nZWh9S1QisP0HE0i1AYM8b_wXixqhBe4xW3vg-Nw/exec";
+      function toggleBlouseFields() {
+        const category = document.getElementById('categorySelect').value;
+        const blouseDiv = document.getElementById('blouseFields');
+        blouseDiv.style.display = (category === 'Blouse') ? 'block' : 'none';
+      }
 
-        let scanQueue = [];
-        let isScanning = true;
-        let pendingData = "";
-
-        // Validates if Name, Phone, and at least 1 QR exist
-        function validateSync() {
-            const hasData = scanQueue.length > 0;
-            const hasName = userNameInput.value.trim().length >= 2;
-            const hasPhone = userPhoneInput.value.trim().length >= 5;
-            syncBtn.disabled = !(hasData && hasName && hasPhone);
-        }
-
-        // Real-time validation as user types
-        [userNameInput, userPhoneInput].forEach(el => {
-            el.addEventListener('input', validateSync);
-        });
-
-        // Initialize Camera
-        navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "environment", focusMode: "continuous" } 
-        }).then(stream => {
-            video.srcObject = stream;
-            video.setAttribute("playsinline", true); 
-            video.play();
-            requestAnimationFrame(tick);
-        }).catch(err => {
-            alert("Camera Error: Please ensure you have granted camera permissions.");
-        });
-
-        function tick() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning) {
-                canvas.height = video.videoHeight;
-                canvas.width = video.videoWidth;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, canvas.width, canvas.height);
-                
-                if (code && code.data.trim() !== "") {
-                    // Check for duplicates in current queue
-                    if (scanQueue.includes(code.data)) {
-                        // Optional: Flash reticle red or ignore
-                    } else {
-                        isScanning = false;
-                        pendingData = code.data;
-                        document.getElementById("modal-data").innerText = code.data;
-                        modal.classList.add("show");
-                        
-                        // Haptic feedback (if supported)
-                        if (navigator.vibrate) navigator.vibrate(50);
-                    }
-                }
-            }
-            requestAnimationFrame(tick);
-        }
-
-        // Modal Controls
-        document.getElementById("addBtn").onclick = () => {
-            scanQueue.push(pendingData);
-            updateUI();
-            closeModal();
-        };
-
-        document.getElementById("discardBtn").onclick = closeModal;
-
-        function closeModal() {
-            modal.classList.remove("show");
-            // Tiny timeout to prevent immediate rescanning of the same code
-            setTimeout(() => { isScanning = true; }, 800);
-        }
-
-        // UI Management
-        function updateUI() {
-            document.getElementById("item-count").innerText = scanQueue.length;
-            itemList.innerHTML = "";
-            
-            scanQueue.forEach((item, index) => {
-                const div = document.createElement("div");
-                div.className = "queue-item";
-                div.innerHTML = `
-                    <div style="display:flex; flex-direction:column; gap:2px;">
-                        <span style="font-size:9px; color:var(--accent); font-weight:bold; letter-spacing:1px;">DATA</span>
-                        <span style="font-size:14px; color:#fff; font-family:monospace;">${item}</span>
-                    </div>
-                    <button class="remove-btn" onclick="removeItem(${index})">×</button>
-                `;
-                itemList.prepend(div);
-            });
-            validateSync();
-        }
-
-        window.removeItem = (index) => {
-            scanQueue.splice(index, 1);
-            updateUI();
-        };
-
-        // Network Sync
-        syncBtn.onclick = async () => {
-            const name = userNameInput.value.trim();
-            const phone = userPhoneInput.value.trim();
-            
-            syncBtn.innerText = "UPLOADING...";
-            syncBtn.disabled = true;
-
-            const payload = {
-                playerName: name,
-                playerPhone: phone,
-                codes: scanQueue
-            };
-
-            try {
-                // Using mode: 'no-cors' with 'text/plain' content-type 
-                // is the most reliable way to post to Google Apps Script
-                await fetch(SCRIPT_URL, {
-                    method: "POST",
-                    mode: 'no-cors',
-                    headers: { "Content-Type": "text/plain" },
-                    body: JSON.stringify(payload)
-                });
-
-                alert(`Sync Complete! ${scanQueue.length} items logged for ${name}.`);
-                
-                // Clear queue but keep name/phone for convenience
-                scanQueue = [];
-                updateUI();
-                
-            } catch (error) {
-                alert("Upload failed. Please check your internet connection.");
-                console.error(error);
-                validateSync(); 
-            } finally {
-                syncBtn.innerText = "CONFIRM & SYNC";
-            }
-        };
+      function handleFormSubmit(formObject) {
+        event.preventDefault();
+        google.script.run.withSuccessHandler(() => {
+          alert("Product Registered Successfully!");
+          document.getElementById('regForm').reset();
+          toggleBlouseFields();
+        }).processForm(formObject);
+      }
     </script>
-</body>
+  </body>
 </html>
